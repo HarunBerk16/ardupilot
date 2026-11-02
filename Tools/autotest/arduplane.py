@@ -6790,6 +6790,62 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         self.context_pop()
         self.fly_home_land_and_disarm()
 
+    def OffboardAttitude(self):
+        '''test OFFBOARD mode 3D attitude control and command timeout'''
+        OFFBOARD = 30
+        ATTITUDE_IGNORE = mavutil.mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE
+        self.set_parameters({
+            "OFFB_TIMEOUT": 0.5,
+            "OFFB_FS_TIME": 5,
+            "OFFB_FS_ACT": 1,  # RTL
+        })
+        self.takeoff(100)
+        self.change_mode(OFFBOARD)
+
+        def send(roll_deg, pitch_deg, yaw_rad, rates=(0, 0, 0), thrust=0.8, type_mask=0):
+            q = quaternion.Quaternion([math.radians(roll_deg), math.radians(pitch_deg), yaw_rad])
+            self.mav.mav.set_attitude_target_send(
+                0, 1, 1, type_mask, q, rates[0], rates[1], rates[2], thrust)
+
+        def fly_for(seconds, command):
+            tstart = self.get_sim_time()
+            while self.get_sim_time_cached() - tstart < seconds:
+                m = self.assert_receive_message('ATTITUDE')
+                command(m)
+            return m
+
+        # banked attitude hold, yaw target follows current heading
+        m = fly_for(10, lambda m: send(45, 5, m.yaw))
+        if abs(math.degrees(m.roll) - 45) > 10:
+            raise NotAchievedException("Failed to hold 45 deg roll (%.1f)" % math.degrees(m.roll))
+        fly_for(5, lambda m: send(0, 5, m.yaw))
+
+        # rate only loop: 60 deg/s pitch rate for 6 seconds
+        self.progress("Flying loop")
+        saw = {"inverted": False}
+
+        def loop_cmd(m):
+            if abs(math.degrees(m.roll)) > 150:
+                saw["inverted"] = True
+            send(0, 0, 0, rates=(0, math.radians(60), 0), thrust=1.0, type_mask=ATTITUDE_IGNORE)
+        fly_for(6, loop_cmd)
+        if not saw["inverted"]:
+            raise NotAchievedException("Did not go inverted during loop")
+        m = fly_for(8, lambda m: send(0, 5, m.yaw))
+        if abs(math.degrees(m.roll)) > 10:
+            raise NotAchievedException("Failed to recover wings level after loop")
+
+        # command timeout: wings level, then RTL after OFFB_FS_TIME
+        fly_for(2, lambda m: send(30, 5, m.yaw))
+        self.progress("Stopping offboard commands")
+        self.wait_statustext("Offboard: command timeout", timeout=5)
+        self.wait_roll(0, accuracy=10, timeout=10)
+        self.assert_mode(OFFBOARD)
+        self.wait_mode('RTL', timeout=15)
+        self.wait_altitude(90, 110, relative=True, timeout=120)
+
+        self.fly_home_land_and_disarm()
+
     def ScriptStats(self):
         '''test script stats logging'''
         self.context_push()
@@ -8177,6 +8233,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.MinThrottle,
             self.ClimbThrottleSaturation,
             self.GuidedAttitudeNoGPS,
+            self.OffboardAttitude,
             self.ScriptStats,
             self.GPSPreArms,
             self.SetHomeAltChange,
