@@ -1290,6 +1290,33 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("RNGFND_LND_DIST", 41, ParametersG2, rangefinder_land_engage_dist_m, 0),
 #endif
 
+#if MODE_OFFBOARD_ENABLED
+    // @Param: OFFB_TIMEOUT
+    // @DisplayName: Offboard mode command timeout
+    // @Description: If no SET_ATTITUDE_TARGET is received in OFFBOARD mode for this time the aircraft holds wings level
+    // @Range: 0.1 5
+    // @Units: s
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("OFFB_TIMEOUT", 42, ParametersG2, offboard_timeout, 0.5f),
+
+    // @Param: OFFB_FS_TIME
+    // @DisplayName: Offboard mode failsafe time
+    // @Description: Time after OFFB_TIMEOUT that the aircraft holds wings level before taking the OFFB_FS_ACT action
+    // @Range: 0 60
+    // @Units: s
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("OFFB_FS_TIME", 43, ParametersG2, offboard_fs_time, 5.0f),
+
+    // @Param: OFFB_FS_ACT
+    // @DisplayName: Offboard mode failsafe action
+    // @Description: Action taken in OFFBOARD mode when external commands are lost for OFFB_TIMEOUT plus OFFB_FS_TIME
+    // @Values: 0:Hold wings level,1:RTL,2:Loiter
+    // @User: Advanced
+    AP_GROUPINFO("OFFB_FS_ACT", 44, ParametersG2, offboard_fs_action, 1),
+#endif
+
     AP_GROUPEND
 };
 

@@ -21,6 +21,10 @@
 #define MODE_AUTOLAND_ENABLED 1
 #endif
 
+#ifndef MODE_OFFBOARD_ENABLED
+#define MODE_OFFBOARD_ENABLED 1
+#endif
+
 #include <AP_Quicktune/AP_Quicktune.h>
 
 class AC_PosControl;
@@ -72,6 +76,9 @@ public:
 #endif
 
     // Mode number 30 reserved for "offboard" for external/lua control.
+#if MODE_OFFBOARD_ENABLED
+        OFFBOARD      = 30,
+#endif
     };
 
     // Constructor
@@ -251,6 +258,41 @@ protected:
 
     bool _enter() override;
 };
+
+#if MODE_OFFBOARD_ENABLED
+/*
+  full 3D attitude control from an external controller (companion
+  computer) using SET_ATTITUDE_TARGET quaternion, body rates and thrust
+ */
+class ModeOffboard : public Mode
+{
+public:
+
+    Mode::Number mode_number() const override { return Mode::Number::OFFBOARD; }
+    const char *name() const override { return "Offboard"; }
+    const char *name4() const override { return "OFFB"; }
+
+    void update() override;
+
+    void run() override;
+
+    // set targets from an external controller, nullptr means field not supplied
+    void set_target(const Quaternion *q, const Vector3f *rate_ff_rads, const float *throttle_pct);
+
+protected:
+
+    bool _enter() override;
+
+private:
+
+    Quaternion target_q;
+    Vector3f rate_ff_rads;
+    float throttle_pct;
+    uint32_t last_cmd_ms;
+    bool timed_out;
+    bool fs_action_done;
+};
+#endif // MODE_OFFBOARD_ENABLED
 
 class ModeAuto : public Mode
 {

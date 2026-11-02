@@ -590,6 +590,12 @@ public:
     AP_Int16 rangefinder_land_engage_dist_m;
 #endif
 
+#if MODE_OFFBOARD_ENABLED
+    AP_Float offboard_timeout;
+    AP_Float offboard_fs_time;
+    AP_Int8 offboard_fs_action;
+#endif
+
 #if AP_PLANE_SYSTEMID_ENABLED
     AP_SystemID systemid;
 #endif

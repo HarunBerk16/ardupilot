@@ -77,6 +77,9 @@ void Plane::rc_failsafe_short_on_event()
     }
     case Mode::Number::AVOID_ADSB:
     case Mode::Number::GUIDED:
+#if MODE_OFFBOARD_ENABLED
+    case Mode::Number::OFFBOARD:
+#endif
     case Mode::Number::LOITER:
     case Mode::Number::THERMAL:
         if (g.fs_action_short != FS_ACTION_SHORT_BESTGUESS) { // if acton = 0(BESTGUESS) this group of modes take no action
@@ -198,6 +201,9 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, ModeReason reason
 
     case Mode::Number::AVOID_ADSB:
     case Mode::Number::GUIDED:
+#if MODE_OFFBOARD_ENABLED
+    case Mode::Number::OFFBOARD:
+#endif
 
         if(g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
 #if HAL_PARACHUTE_ENABLED

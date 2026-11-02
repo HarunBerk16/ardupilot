@@ -51,6 +51,13 @@ void GCS_Plane::update_vehicle_sensor_status_flags(void)
         attitude_stabilized = true;
         break;
 
+#if MODE_OFFBOARD_ENABLED
+    case Mode::Number::OFFBOARD:
+        rate_controlled = true;
+        attitude_stabilized = true;
+        break;
+#endif
+
     case Mode::Number::TRAINING:
         if (!plane.training_manual_roll || !plane.training_manual_pitch) {
             rate_controlled = true;

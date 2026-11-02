@@ -62,6 +62,9 @@ uint8_t GCS_MAVLINK_Plane::base_mode() const
 #if MODE_AUTOLAND_ENABLED
     case Mode::Number::AUTOLAND:
 #endif
+#if MODE_OFFBOARD_ENABLED
+    case Mode::Number::OFFBOARD:
+#endif
 #if HAL_QUADPLANE_ENABLED
     case Mode::Number::QRTL:
     case Mode::Number::LOITER_ALT_QLAND:
@@ -1017,6 +1020,12 @@ void GCS_MAVLINK_Plane::handle_set_attitude_target(const mavlink_message_t &msg)
         // in e.g., RTL, CICLE. Specifying a single mode for companion
         // computer control is more safe (even more so when using
         // FENCE_ACTION = 4 for geofence failures).
+#if MODE_OFFBOARD_ENABLED
+        if (plane.control_mode == &plane.mode_offboard) {
+            handle_set_attitude_target_offboard(msg);
+            return;
+        }
+#endif
         if (plane.control_mode != &plane.mode_guided) { // don't screw up failsafes
             return;
         }
@@ -1077,6 +1086,43 @@ void GCS_MAVLINK_Plane::handle_set_attitude_target(const mavlink_message_t &msg)
             plane.guided_state.last_forced_throttle_ms = now;
         }
     }
+
+#if MODE_OFFBOARD_ENABLED
+/*
+  full 3D attitude target for OFFBOARD mode. The quaternion is used
+  directly without euler conversion or attitude limits, body rates are
+  feedforward in rad/s and thrust is 0 to 1
+ */
+void GCS_MAVLINK_Plane::handle_set_attitude_target_offboard(const mavlink_message_t &msg)
+{
+    mavlink_set_attitude_target_t att_target;
+    mavlink_msg_set_attitude_target_decode(&msg, &att_target);
+
+    const uint8_t mask = att_target.type_mask;
+
+    Quaternion q {att_target.q[0], att_target.q[1], att_target.q[2], att_target.q[3]};
+    const bool use_q = (mask & ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE) == 0;
+
+    // ignored rate axes are treated as zero feedforward
+    Vector3f rates;
+    if ((mask & ATTITUDE_TARGET_TYPEMASK_BODY_ROLL_RATE_IGNORE) == 0) {
+        rates.x = att_target.body_roll_rate;
+    }
+    if ((mask & ATTITUDE_TARGET_TYPEMASK_BODY_PITCH_RATE_IGNORE) == 0) {
+        rates.y = att_target.body_pitch_rate;
+    }
+    if ((mask & ATTITUDE_TARGET_TYPEMASK_BODY_YAW_RATE_IGNORE) == 0) {
+        rates.z = att_target.body_yaw_rate;
+    }
+
+    const float throttle_pct = att_target.thrust * 100.0f;
+    const bool use_throttle = (mask & ATTITUDE_TARGET_TYPEMASK_THROTTLE_IGNORE) == 0;
+
+    plane.mode_offboard.set_target(use_q ? &q : nullptr,
+                                   &rates,
+                                   use_throttle ? &throttle_pct : nullptr);
+}
+#endif // MODE_OFFBOARD_ENABLED
 
 void GCS_MAVLINK_Plane::handle_set_position_target_local_ned(const mavlink_message_t &msg)
     {
@@ -1309,6 +1355,9 @@ uint8_t GCS_MAVLINK_Plane::send_available_mode(uint8_t index) const
 #endif
 #if MODE_AUTOLAND_ENABLED
         &plane.mode_autoland,
+#endif
+#if MODE_OFFBOARD_ENABLED
+        &plane.mode_offboard,
 #endif
     };
 
